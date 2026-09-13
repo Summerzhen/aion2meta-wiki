@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aion2meta-wiki",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-09-13",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "force-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "aion2meta.wiki/*", "zone_name": "aion2meta.wiki" },
+    { "pattern": "www.aion2meta.wiki/*", "zone_name": "aion2meta.wiki" }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
