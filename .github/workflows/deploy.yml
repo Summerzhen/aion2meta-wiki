@@ -18,6 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Build static site
+        env:
+          AION2_OUTPUT_DIR: public
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
+          NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ secrets.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }}
+        run: python build_site.py
+
       - name: Verify static assets
         run: |
           test -f public/index.html
@@ -27,6 +34,8 @@ jobs:
           grep -q "AION 2 Meta" public/index.html
           grep -q "Beginner Complexity" public/index.html
           grep -q "Sources" public/index.html
+          grep -q "google-site-verification" public/index.html
+          grep -q "googletagmanager.com/gtag/js" public/index.html
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3

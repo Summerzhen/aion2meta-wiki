@@ -1,14 +1,18 @@
 from pathlib import Path
 from html import escape
 import json
+import os
 
-ROOT = Path(__file__).parent
+BASE = Path(__file__).parent
+ROOT = Path(os.environ.get("AION2_OUTPUT_DIR", BASE))
 SITE = {
     "name": "AION 2 Meta",
     "domain": "aion2meta.wiki",
     "tagline": "Global builds, tier lists and class guides for the latest AION 2 patch.",
     "updated": "September 13, 2026",
 }
+GA_MEASUREMENT_ID = os.environ.get("NEXT_PUBLIC_GA_MEASUREMENT_ID", "").strip()
+GOOGLE_SITE_VERIFICATION = os.environ.get("NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", "").strip()
 
 CLASSES = [
     ("gladiator", "Gladiator", "Melee bruiser", "Durable weapon fighter for players who want direct pressure and forgiving uptime.", "Medium"),
@@ -89,6 +93,26 @@ PRELAUNCH_PAGES = [
 def json_ld(data):
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
 
+def analytics_head():
+    parts = []
+    if GOOGLE_SITE_VERIFICATION:
+        parts.append(f'  <meta name="google-site-verification" content="{escape(GOOGLE_SITE_VERIFICATION)}">')
+    if GA_MEASUREMENT_ID:
+        ga = escape(GA_MEASUREMENT_ID)
+        parts.append(f'  <script async src="https://www.googletagmanager.com/gtag/js?id={ga}"></script>')
+        parts.append(f"""  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){{dataLayer.push(arguments);}}
+    gtag('js', new Date());
+    gtag('config', '{ga}');
+  </script>""")
+    return "\n".join(parts)
+
+def table_html(caption, head, rows, class_name=""):
+    class_attr = f" class='{escape(class_name)}'" if class_name else ""
+    caption_html = f"<caption>{escape(caption)}</caption>"
+    return f"<div class='table-wrap'><table{class_attr}>{caption_html}<thead>{head}</thead><tbody>{rows}</tbody></table></div>"
+
 def write(path, body):
     target = ROOT / path.strip("/")
     if path.endswith("/"):
@@ -105,8 +129,12 @@ def card(title, text, href=None, meta=None):
     return f'<article class="card">{meta_html}<h3>{escape(title)}</h3><p>{escape(text)}</p>{link}</article>'
 
 def page(title, description, slug, main, extra_class=""):
+    main = main.replace("<div class='table-wrap'><table><thead>", f"<div class='table-wrap'><table><caption>{escape(title)} data table</caption><thead>")
     nav = "".join(f'<a href="{href}">{label}</a>' for href, label in NAV)
     canonical = f"https://{SITE['domain']}{url_for(slug)}"
+    robots = "  <meta name=\"robots\" content=\"noindex,follow\">\n" if slug == "404" else ""
+    analytics = analytics_head()
+    analytics = f"\n{analytics}" if analytics else ""
     page_name = f"{title} | {SITE['name']}"
     path_parts = [part for part in url_for(slug).strip("/").split("/") if part]
     breadcrumb_items = [{"@type": "ListItem", "position": 1, "name": SITE["name"], "item": f"https://{SITE['domain']}/"}]
@@ -138,11 +166,13 @@ def page(title, description, slug, main, extra_class=""):
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="{escape(page_name)}">
   <meta name="twitter:description" content="{escape(description)}">
+{robots.rstrip()}
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/site.webmanifest">
   <meta name="theme-color" content="#080a0f">
   <link rel="stylesheet" href="/assets/styles.css">
   <script type="application/ld+json">{json_ld(schema)}</script>
+{analytics}
   <script defer src="/assets/site.js"></script>
 </head>
 <body class="{extra_class}">
@@ -189,7 +219,7 @@ def matrix():
         complexity = "High" if slug in {"assassin", "spiritmaster"} else "Medium"
         rows.append(f"<tr><th><a href='/classes/{slug}/'>{name}</a></th>{cells}<td>{complexity}</td></tr>")
     head = "".join(f"<th>{c}</th>" for c in ["Class"] + cols)
-    return f"<div class='table-wrap'><table class='tier-matrix'><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    return table_html("AION 2 Global class tier matrix with pre-launch TBD rankings and beginner complexity", f"<tr>{head}</tr>", "".join(rows), "tier-matrix")
 
 def content_section(title, body):
     return f"<section class='section'><h2>{escape(title)}</h2>{body}</section>"
@@ -202,13 +232,13 @@ def class_compare_table():
     for slug, name, role, _, diff in CLASSES:
         data = CLASS_DATA[slug]
         rows.append(f"<tr><th><a href='/classes/{slug}/'>{name}</a></th><td>{data['archetype']}</td><td>{role}</td><td>{data['range']}</td><td>{diff}</td><td>{data['beginner']}</td></tr>")
-    return "<div class='table-wrap'><table><thead><tr><th>Class</th><th>Archetype</th><th>Role</th><th>Range</th><th>Difficulty</th><th>Beginner Note</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+    return table_html("AION 2 class comparison by archetype, role, range and beginner fit", "<tr><th>Class</th><th>Archetype</th><th>Role</th><th>Range</th><th>Difficulty</th><th>Beginner Note</th></tr>", "".join(rows))
 
 def source_note():
     return "<p class='source-note'>Source status: Steam / official storefront facts are treated as Official. Class ranking, build strength, economy and PvP dominance remain unverified for Global until launch testing.</p>"
 
 def sources_section(extra=""):
-    links = "<ul><li><a href='https://store.steampowered.com/app/3393110/AION_2/'>AION 2 on Steam</a> for launch date, gameplay pillars, dungeons, customization and PC requirements.</li><li><a href='https://store.steampowered.com/app/4972180/AION_2_FOUNDERS_PACK/'>AION 2 Founder's Pack on Steam</a> for edition names, prices and advance access framing.</li></ul>"
+    links = "<ul><li><a href='https://store.steampowered.com/app/3393110/AION_2/' target='_blank' rel='noopener noreferrer'>AION 2 on Steam</a> for launch date, gameplay pillars, dungeons, customization and PC requirements.</li><li><a href='https://store.steampowered.com/app/4972180/AION_2_FOUNDERS_PACK/' target='_blank' rel='noopener noreferrer'>AION 2 Founder's Pack on Steam</a> for edition names, prices and advance access framing.</li></ul>"
     if extra:
         links += extra
     return content_section("Sources", links)
@@ -245,7 +275,7 @@ for slug, name, role, desc, diff in CLASSES:
 
 for slug, name, role, desc, diff in CLASSES:
     data = CLASS_DATA[slug]
-    tabs = """<div class="tabs" data-tabs><div role="tablist" aria-label="Build mode"><button class="active" data-tab="pve">PvE</button><button data-tab="pvp">PvP</button><button data-tab="solo">Solo</button></div><section data-panel="pve"><h3>PvE Build</h3><p>Core skills, rotation, gear priority and stigma choices stay pending until Global launch data can be tested.</p></section><section hidden data-panel="pvp"><h3>PvP Build</h3><p>PvP recommendations will separate 1v1, small-scale and large-scale evidence instead of merging them into one vague rank.</p></section><section hidden data-panel="solo"><h3>Solo Build</h3><p>Solo guidance will focus on survivability, uptime and low-friction progression once Global values are known.</p></section></div>"""
+    tabs = """<div class="tabs" data-tabs><div role="tablist" aria-label="Build mode"><button class="active" role="tab" aria-selected="true" data-tab="pve">PvE</button><button role="tab" aria-selected="false" data-tab="pvp">PvP</button><button role="tab" aria-selected="false" data-tab="solo">Solo</button></div><section role="tabpanel" data-panel="pve"><h3>PvE Build</h3><p>Core skills, rotation, gear priority and stigma choices stay pending until Global launch data can be tested.</p></section><section role="tabpanel" hidden data-panel="pvp"><h3>PvP Build</h3><p>PvP recommendations will separate 1v1, small-scale and large-scale evidence instead of merging them into one vague rank.</p></section><section role="tabpanel" hidden data-panel="solo"><h3>Solo Build</h3><p>Solo guidance will focus on survivability, uptime and low-friction progression once Global values are known.</p></section></div>"""
     body = hero(f"Best AION 2 {name} Build", f"Structured {name} build page for PvE, PvP and Solo. Current patch: Global Launch pre-release.", "Build Template")
     body += content_section("Build Status", f"<div class='notice'><b>Status:</b> Framework ready, recommendations pending Global verification. No fake top-rank claims.</div><div class='summary'><div><b>Role</b><span>{role}</span></div><div><b>Party Job</b><span>{data['party']}</span></div><div><b>Range</b><span>{data['range']}</span></div><div><b>Watch First</b><span>{data['watch']}</span></div></div>")
     body += content_section("Build Modes", tabs)
@@ -254,10 +284,10 @@ for slug, name, role, desc, diff in CLASSES:
 
 tier_pages = {
     "class-tier-list": ("AION 2 Class Tier List", "AION 2 class tier list matrix for Global launch, tracking Solo, Dungeon, Raid and PvP rankings with evidence status.", "Full activity matrix", matrix()),
-    "pve-tier-list": ("AION 2 PvE Tier List", "AION 2 PvE tier list for dungeon, raid and solo PvE rankings once Global launch data is verified.", "PvE ranks", matrix()),
-    "pvp-tier-list": ("AION 2 PvP Tier List", "AION 2 PvP tier list split by 1v1, small-scale and large-scale Global PvP evidence.", "PvP ranks", matrix()),
-    "beginner-tier-list": ("AION 2 Beginner Tier List", "Best AION 2 beginner classes by difficulty, role clarity and early progression friendliness.", "Beginner picks", matrix()),
-    "solo-tier-list": ("AION 2 Solo Tier List", "AION 2 solo class tier list for leveling, self-sustain and open-world comfort after Global verification.", "Solo ranks", matrix()),
+    "pve-tier-list": ("AION 2 PvE Tier List", "AION 2 PvE tier list for dungeon, raid and solo PvE rankings, held as TBD until Global launch testing verifies class performance.", "PvE ranks", matrix()),
+    "pvp-tier-list": ("AION 2 PvP Tier List", "AION 2 PvP tier list split by 1v1, small-scale and large-scale play, with Global evidence labels for every future rank.", "PvP ranks", matrix()),
+    "beginner-tier-list": ("AION 2 Beginner Tier List", "Best AION 2 beginner classes by difficulty, role clarity and launch progression friendliness, separated from raw power rankings.", "Beginner picks", matrix()),
+    "solo-tier-list": ("AION 2 Solo Tier List", "AION 2 solo class tier list for leveling, self-sustain and open-world comfort, updated only after Global verification.", "Solo ranks", matrix()),
 }
 
 tier_hub_cards = "".join(card(title.replace("AION 2 ", ""), desc, f"/tier-list/{slug}/", "Tier") for slug, (title, desc, _, _) in tier_pages.items())
@@ -276,9 +306,9 @@ guide_pages = {
     "best-class": ("AION 2 Best Class", "Choose the best AION 2 class for your goal without relying on unverified Global tier claims.", "Match your goal to a role, then revisit the tier matrix after Global testing starts."),
     "beginner-guide": ("AION 2 Beginner Guide", "A practical AION 2 beginner guide for launch preparation, class choice and progression priorities.", "Start with class fit, learn group roles, follow verified patch notes and avoid overcommitting to pre-launch rankings."),
     "leveling-guide": ("AION 2 Leveling Guide", "AION 2 leveling guide framework for launch players, updated as Global progression data is verified.", "Leveling advice is held to known systems and will expand after launch routes, rewards and bottlenecks are confirmed."),
-    "gear-progression": ("AION 2 Gear Progression", "AION 2 gear progression guide framework for Global launch.", "Gear pages will track sources, upgrade priorities and patch evidence once Global itemization is public."),
+    "gear-progression": ("AION 2 Gear Progression", "AION 2 gear progression guide for Global launch, prepared for verified item sources, upgrade paths and role stat priorities.", "Gear pages will track sources, upgrade priorities and patch evidence once Global itemization is public."),
     "pvp-guide": ("AION 2 PvP Guide", "AION 2 PvP guide for launch players, split by 1v1, small-scale and large-scale play.", "PvP guidance starts with roles and positioning, then adds matchup data after Global testing."),
-    "factions": ("AION 2 Factions", "AION 2 faction guide for launch players.", "Faction information will stay limited to verified official details and launch-client checks."),
+    "factions": ("AION 2 Factions", "AION 2 faction guide for launch players, covering verified faction restrictions, server planning and PvP implications.", "Faction information will stay limited to verified official details and launch-client checks."),
 }
 
 guide_hub_cards = "".join(card(title.replace("AION 2 ", ""), desc, f"/guides/{slug}/", "Guide") for slug, (title, desc, _) in guide_pages.items())
@@ -384,7 +414,7 @@ body += content_section("Comparison", "<div class='table-wrap'><table><thead><tr
 body += content_section("Why Regional Data Can Mislead", "<p>Regional versions can be useful for deciding what to test first, but they can mislead Global players when patch timing, monetization, economy maturity, server population or launch roster differs. A build that is stable in an older live environment may be wrong for a fresh Global economy, and a PvP matchup that depends on experienced players may not describe launch-week behavior.</p>")
 body += content_section("How This Site Uses KR/TW Reference", "<ol><li>Use regional data to form test hypotheses.</li><li>Label it as KR/TW Reference, never Global Verified.</li><li>Retest in the Global client before updating ranks or build recommendations.</li><li>Log every rank change with patch, date and reason.</li></ol>")
 body += sources_section()
-write("meta/global-vs-korea/", page("AION 2 Global vs Korea Meta", "AION 2 Global vs KR/TW meta comparison and evidence policy.", "meta/global-vs-korea", body))
+write("meta/global-vs-korea/", page("AION 2 Global vs Korea Meta", "AION 2 Global vs KR/TW meta comparison for class balance, economy, PvP and dungeon assumptions, with evidence policy labels.", "meta/global-vs-korea", body))
 
 meta_hub_cards = card("Global vs KR/TW", "Separate regional reference from Global proof.", "/meta/global-vs-korea/", "Meta")
 meta_hub_cards += "".join(card(label, f"Meta operations and evidence framework for {label.lower()}.", href, "Meta") for href, label in META_PAGES if href.startswith("/meta/"))
@@ -422,7 +452,7 @@ body += content_section("Find The Right Page", "<div class='grid cards'>" + card
 write("404.html", page("Page Not Found", "AION 2 Meta 404 page with links to classes, tier lists, guides and update log.", "404", body))
 
 styles = r"""
-:root{color-scheme:dark;--bg:#080a0f;--panel:#111722;--panel2:#171f2d;--text:#edf4ff;--muted:#a9b6c8;--line:#293448;--gold:#f2c36b;--blue:#76d5ff;--red:#ff7e79;--green:#86e3b2;--shadow:0 24px 80px rgba(0,0,0,.35)}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0%,rgba(118,213,255,.18),transparent 34rem),radial-gradient(circle at 90% 12%,rgba(242,195,107,.14),transparent 28rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;line-height:1.6}a{color:inherit}.skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;z-index:99;background:#fff;color:#000;padding:.5rem 1rem}.site-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,4rem);border-bottom:1px solid rgba(255,255,255,.1);background:rgba(8,10,15,.82);backdrop-filter:blur(14px)}.brand{display:flex;align-items:center;gap:.7rem;text-decoration:none;font-weight:800}.brand-mark{display:grid;place-items:center;width:2.35rem;height:2.35rem;border:1px solid rgba(242,195,107,.5);background:linear-gradient(145deg,#1b2534,#0c1017);color:var(--gold);font-size:.85rem}.site-header nav{display:flex;gap:.35rem;flex-wrap:wrap}.site-header nav a{padding:.55rem .75rem;border-radius:.35rem;color:var(--muted);text-decoration:none;font-size:.92rem}.site-header nav a:hover,.site-header nav a:focus{background:rgba(255,255,255,.08);color:var(--text)}.hero{min-height:clamp(520px,70vh,760px);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.65fr);gap:2rem;align-items:center;padding:clamp(3rem,7vw,7rem) clamp(1rem,4vw,4rem);border-bottom:1px solid rgba(255,255,255,.1)}.hero h1{font-size:clamp(2.8rem,7vw,6.8rem);line-height:.9;letter-spacing:0;margin:.4rem 0 1.3rem;max-width:11ch}.lead{font-size:clamp(1.1rem,2.2vw,1.45rem);color:#d8e4f5;max-width:43rem}.eyebrow{margin:0;color:var(--gold);font-weight:800;text-transform:uppercase;font-size:.78rem;letter-spacing:.12em}.hero-actions{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.7rem}.button,.card-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.72rem 1rem;border:1px solid rgba(255,255,255,.16);border-radius:.35rem;text-decoration:none;font-weight:800;background:rgba(255,255,255,.06)}.button.primary{background:var(--gold);color:#12100a;border-color:var(--gold)}.status-panel,.card,.notice{background:linear-gradient(180deg,rgba(23,31,45,.92),rgba(12,16,23,.92));border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow);padding:1.25rem}.status-panel{align-self:stretch;display:flex;flex-direction:column;justify-content:end;min-height:24rem}.status-dot{width:.8rem;height:.8rem;border-radius:99px;background:var(--red);box-shadow:0 0 0 .45rem rgba(255,126,121,.12);margin-bottom:1rem}.status-panel dl{display:grid;gap:.7rem;margin:1rem 0 0}.status-panel dl div,.summary div,.timeline div{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid rgba(255,255,255,.1);padding-top:.75rem}.status-panel dt,.summary b{color:var(--muted)}.status-panel dd{margin:0;font-weight:800}.section{padding:clamp(2.5rem,5vw,5rem) clamp(1rem,4vw,4rem);max-width:1320px;margin:0 auto}.section h2{font-size:clamp(1.8rem,3vw,3rem);line-height:1.05;margin:0 0 1.2rem}.grid{display:grid;gap:1rem}.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.facts{grid-template-columns:repeat(4,minmax(0,1fr))}.facts div{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);padding:1rem}.facts b{display:block;color:var(--gold);margin-bottom:.35rem}.facts span{color:#d8e4f5}.source-note{color:var(--muted);max-width:62rem}.card{min-height:14rem;display:flex;flex-direction:column}.card h3{font-size:1.35rem;margin:.3rem 0 .5rem}.card p{color:var(--muted);margin:0 0 1rem}.card-link{margin-top:auto;width:max-content}.table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.13);background:rgba(17,23,34,.72)}table{width:100%;border-collapse:collapse;min-width:760px}th,td{text-align:left;padding:1rem;border-bottom:1px solid rgba(255,255,255,.1);vertical-align:top}thead th{color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}tbody th{white-space:nowrap}.pill{display:inline-flex;min-width:3rem;justify-content:center;padding:.25rem .55rem;border-radius:99px;background:rgba(255,255,255,.08);font-weight:800;font-size:.78rem}.pill.muted{color:var(--muted)}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}.summary div{display:block;background:rgba(255,255,255,.05);padding:1rem;border:1px solid rgba(255,255,255,.1)}.summary span{display:block;margin-top:.35rem}.evidence-row{display:flex;flex-wrap:wrap;gap:.7rem}.evidence-row span{padding:.55rem .75rem;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.06);font-weight:800}.tabs{border:1px solid rgba(255,255,255,.13);background:rgba(17,23,34,.72);padding:1rem}.tabs [role=tablist]{display:flex;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:.8rem}.tabs button{min-height:44px;padding:.6rem 1rem;border:1px solid rgba(255,255,255,.18);background:transparent;color:var(--text);font-weight:800;border-radius:.3rem}.tabs button.active{background:var(--blue);color:#061018;border-color:var(--blue)}.timeline{display:grid;gap:1rem;max-width:760px}.timeline div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);padding:1rem}.site-footer{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem;padding:2rem clamp(1rem,4vw,4rem);border-top:1px solid rgba(255,255,255,.1);color:var(--muted)}.site-footer strong{color:var(--text);font-size:1.25rem}.small{font-size:.86rem}@media (max-width:1040px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:880px){.site-header{align-items:flex-start;flex-direction:column}.hero{grid-template-columns:1fr;min-height:auto}.hero h1{max-width:12ch}.cards{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.site-footer{grid-template-columns:1fr}}@media (max-width:520px){.facts,.summary{grid-template-columns:1fr}.hero{padding-top:2rem}.site-header nav a{padding:.45rem .5rem}.status-panel{min-height:auto}.section{padding-block:2rem}}
+:root{color-scheme:dark;--bg:#080a0f;--panel:#111722;--panel2:#171f2d;--text:#edf4ff;--muted:#a9b6c8;--line:#293448;--gold:#f2c36b;--blue:#76d5ff;--red:#ff7e79;--green:#86e3b2;--shadow:0 24px 80px rgba(0,0,0,.35)}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0%,rgba(118,213,255,.18),transparent 34rem),radial-gradient(circle at 90% 12%,rgba(242,195,107,.14),transparent 28rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;line-height:1.6}a{color:inherit}.skip{position:absolute;left:-999px}.skip:focus{left:1rem;top:1rem;z-index:99;background:#fff;color:#000;padding:.5rem 1rem}.site-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,4vw,4rem);border-bottom:1px solid rgba(255,255,255,.1);background:rgba(8,10,15,.82);backdrop-filter:blur(14px)}.brand{display:flex;align-items:center;gap:.7rem;text-decoration:none;font-weight:800}.brand-mark{display:grid;place-items:center;width:2.35rem;height:2.35rem;border:1px solid rgba(242,195,107,.5);background:linear-gradient(145deg,#1b2534,#0c1017);color:var(--gold);font-size:.85rem}.site-header nav{display:flex;gap:.35rem;flex-wrap:wrap}.site-header nav a{padding:.55rem .75rem;border-radius:.35rem;color:var(--muted);text-decoration:none;font-size:.92rem}.site-header nav a:hover,.site-header nav a:focus{background:rgba(255,255,255,.08);color:var(--text)}.hero{min-height:clamp(520px,70vh,760px);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.65fr);gap:2rem;align-items:center;padding:clamp(3rem,7vw,7rem) clamp(1rem,4vw,4rem);border-bottom:1px solid rgba(255,255,255,.1)}.hero h1{font-size:clamp(2.8rem,7vw,6.8rem);line-height:.9;letter-spacing:0;margin:.4rem 0 1.3rem;max-width:11ch}.lead{font-size:clamp(1.1rem,2.2vw,1.45rem);color:#d8e4f5;max-width:43rem}.eyebrow{margin:0;color:var(--gold);font-weight:800;text-transform:uppercase;font-size:.78rem;letter-spacing:.12em}.hero-actions{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.7rem}.button,.card-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.72rem 1rem;border:1px solid rgba(255,255,255,.16);border-radius:.35rem;text-decoration:none;font-weight:800;background:rgba(255,255,255,.06)}.button.primary{background:var(--gold);color:#12100a;border-color:var(--gold)}.status-panel,.card,.notice{background:linear-gradient(180deg,rgba(23,31,45,.92),rgba(12,16,23,.92));border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow);padding:1.25rem}.status-panel{align-self:stretch;display:flex;flex-direction:column;justify-content:end;min-height:24rem}.status-dot{width:.8rem;height:.8rem;border-radius:99px;background:var(--red);box-shadow:0 0 0 .45rem rgba(255,126,121,.12);margin-bottom:1rem}.status-panel dl{display:grid;gap:.7rem;margin:1rem 0 0}.status-panel dl div,.summary div,.timeline div{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid rgba(255,255,255,.1);padding-top:.75rem}.status-panel dt,.summary b{color:var(--muted)}.status-panel dd{margin:0;font-weight:800}.section{padding:clamp(2.5rem,5vw,5rem) clamp(1rem,4vw,4rem);max-width:1320px;margin:0 auto}.section h2{font-size:clamp(1.8rem,3vw,3rem);line-height:1.05;margin:0 0 1.2rem}.grid{display:grid;gap:1rem}.cards{grid-template-columns:repeat(3,minmax(0,1fr))}.facts{grid-template-columns:repeat(4,minmax(0,1fr))}.facts div{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);padding:1rem}.facts b{display:block;color:var(--gold);margin-bottom:.35rem}.facts span{color:#d8e4f5}.source-note{color:var(--muted);max-width:62rem}.card{min-height:14rem;display:flex;flex-direction:column}.card h3{font-size:1.35rem;margin:.3rem 0 .5rem}.card p{color:var(--muted);margin:0 0 1rem}.card-link{margin-top:auto;width:max-content}.table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.13);background:rgba(17,23,34,.72)}table{width:100%;border-collapse:collapse;min-width:760px}caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}th,td{text-align:left;padding:1rem;border-bottom:1px solid rgba(255,255,255,.1);vertical-align:top}thead th{color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}tbody th{white-space:nowrap}.pill{display:inline-flex;min-width:3rem;justify-content:center;padding:.25rem .55rem;border-radius:99px;background:rgba(255,255,255,.08);font-weight:800;font-size:.78rem}.pill.muted{color:var(--muted)}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}.summary div{display:block;background:rgba(255,255,255,.05);padding:1rem;border:1px solid rgba(255,255,255,.1)}.summary span{display:block;margin-top:.35rem}.evidence-row{display:flex;flex-wrap:wrap;gap:.7rem}.evidence-row span{padding:.55rem .75rem;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.06);font-weight:800}.tabs{border:1px solid rgba(255,255,255,.13);background:rgba(17,23,34,.72);padding:1rem}.tabs [role=tablist]{display:flex;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:.8rem}.tabs button{min-height:44px;padding:.6rem 1rem;border:1px solid rgba(255,255,255,.18);background:transparent;color:var(--text);font-weight:800;border-radius:.3rem}.tabs button.active{background:var(--blue);color:#061018;border-color:var(--blue)}.timeline{display:grid;gap:1rem;max-width:760px}.timeline div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);padding:1rem}.site-footer{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem;padding:2rem clamp(1rem,4vw,4rem);border-top:1px solid rgba(255,255,255,.1);color:var(--muted)}.site-footer strong{color:var(--text);font-size:1.25rem}.small{font-size:.86rem}@media (max-width:1040px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:880px){.site-header{align-items:flex-start;flex-direction:column}.hero{grid-template-columns:1fr;min-height:auto}.hero h1{max-width:12ch}.cards{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.site-footer{grid-template-columns:1fr}}@media (max-width:520px){.facts,.summary{grid-template-columns:1fr}.hero{padding-top:2rem}.site-header nav a{padding:.45rem .5rem}.status-panel{min-height:auto}.section{padding-block:2rem}}
 """
 write("assets/styles.css", styles)
 
@@ -452,7 +482,11 @@ document.querySelectorAll('[data-tabs]').forEach((tabs) => {
   const panels = tabs.querySelectorAll('[data-panel]');
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
-      buttons.forEach((item) => item.classList.toggle('active', item === button));
+      buttons.forEach((item) => {
+        const selected = item === button;
+        item.classList.toggle('active', selected);
+        item.setAttribute('aria-selected', String(selected));
+      });
       panels.forEach((panel) => panel.hidden = panel.dataset.panel !== button.dataset.tab);
     });
   });
@@ -475,5 +509,6 @@ xml_sitemap = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http:
 ) + "\n</urlset>\n"
 write("sitemap.xml", xml_sitemap)
 write("robots.txt", f"User-agent: *\nAllow: /\nSitemap: https://{SITE['domain']}/sitemap.xml\n")
+write("CNAME", f"{SITE['domain']}\n")
 
 print(f"Generated {len(all_urls)} pages in {ROOT}")
