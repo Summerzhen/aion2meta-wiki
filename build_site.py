@@ -182,12 +182,12 @@ def hero(title, text, eyebrow="Global Meta Tracker"):
 </section>"""
 
 def matrix():
-    cols = ["Solo", "Dungeon", "Raid", "1v1 PvP", "Small PvP", "Large PvP", "Beginner"]
+    cols = ["Solo", "Dungeon", "Raid", "1v1 PvP", "Small PvP", "Large PvP", "Beginner Complexity"]
     rows = []
-    stars = {"assassin": "**", "spiritmaster": "**"}
     for slug, name, *_ in CLASSES:
         cells = "".join("<td><span class='pill muted'>TBD</span></td>" for _ in cols[:-1])
-        rows.append(f"<tr><th><a href='/classes/{slug}/'>{name}</a></th>{cells}<td>{stars.get(slug, '***')}</td></tr>")
+        complexity = "High" if slug in {"assassin", "spiritmaster"} else "Medium"
+        rows.append(f"<tr><th><a href='/classes/{slug}/'>{name}</a></th>{cells}<td>{complexity}</td></tr>")
     head = "".join(f"<th>{c}</th>" for c in ["Class"] + cols)
     return f"<div class='table-wrap'><table class='tier-matrix'><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
 
@@ -207,6 +207,12 @@ def class_compare_table():
 def source_note():
     return "<p class='source-note'>Source status: Steam / official storefront facts are treated as Official. Class ranking, build strength, economy and PvP dominance remain unverified for Global until launch testing.</p>"
 
+def sources_section(extra=""):
+    links = "<ul><li><a href='https://store.steampowered.com/app/3393110/AION_2/'>AION 2 on Steam</a> for launch date, gameplay pillars, dungeons, customization and PC requirements.</li><li><a href='https://store.steampowered.com/app/4972180/AION_2_FOUNDERS_PACK/'>AION 2 Founder's Pack on Steam</a> for edition names, prices and advance access framing.</li></ul>"
+    if extra:
+        links += extra
+    return content_section("Sources", links)
+
 home_cards = "".join([
     card("Current Meta", "Versioned class tier matrix for Global launch, with evidence labels before any rating becomes final.", "/tier-list/class-tier-list/", "P0"),
     card("Choose Your Class", "Eight launch class overviews split by role, difficulty, PvE, PvP and who should play them.", "/classes/", "P0"),
@@ -219,7 +225,7 @@ home_cards = "".join([
 meta_cards = "".join(card(label, f"Confirmed pre-launch data and update framework for {label.lower()}.", href, "Data") for href, label in META_PAGES)
 prelaunch_cards = "".join(card(label, f"Launch preparation page for {label.lower()} search intent.", href, "Pre-launch") for href, label in PRELAUNCH_PAGES)
 
-home = hero("AION 2 Meta", SITE["tagline"]) + content_section("Confirmed Global Facts", facts_grid() + source_note()) + content_section("Start Here", f"<div class='grid cards'>{home_cards}</div>") + content_section("Launch Prep Pages", f"<div class='grid cards'>{prelaunch_cards}</div>") + content_section("Confirmed Data Pages", f"<div class='grid cards'>{meta_cards}</div>") + content_section("Global Class Tier Matrix", matrix()) + content_section("Evidence Rules", "<div class='evidence-row'><span>Official</span><span>Global Verified</span><span>KR/TW Reference</span><span>Unconfirmed</span></div><p>Ratings, builds and patch movement should show the source type, last tested date and reason. That is the editorial promise of this site.</p>")
+home = hero("AION 2 Meta", SITE["tagline"]) + content_section("Confirmed Global Facts", facts_grid() + source_note()) + content_section("Start Here", f"<div class='grid cards'>{home_cards}</div>") + content_section("Launch Prep Pages", f"<div class='grid cards'>{prelaunch_cards}</div>") + content_section("Confirmed Data Pages", f"<div class='grid cards'>{meta_cards}</div>") + content_section("Global Class Tier Matrix", matrix()) + content_section("Evidence Rules", "<div class='evidence-row'><span>Official</span><span>Global Verified</span><span>KR/TW Reference</span><span>Unconfirmed</span></div><p>Ratings, builds and patch movement should show the source type, last tested date and reason. Beginner Complexity is not a power ranking; it is a pre-launch estimate of how demanding the class may be for a new player.</p>") + sources_section()
 write("index.html", page("AION 2 Meta - Global Builds, Tier Lists & Class Meta", "AION 2 Global meta tracker for class rankings, builds, release date, founder packs and launch guides.", "index", home, "home"))
 
 classes_cards = "".join(card(name, desc, f"/classes/{slug}/", role) for slug, name, role, desc, _ in CLASSES)
@@ -337,12 +343,15 @@ write("server-status/", page("AION 2 Server Status", "AION 2 server status page 
 body = hero("AION 2 Preload & Download", "A cautious launch-prep page for download size, storage and preload status.", "Download")
 body += content_section("Known Requirement", "<div class='notice'><b>Storage:</b> Steam currently lists 100 GB available space in the minimum requirements.</div>")
 body += content_section("Preload Status", "<p>No preload window is published here until it can be verified from an official source or the Steam client. Treat any unverified preload time as a rumor.</p>")
+body += content_section("What The 100 GB Requirement Means", "<p>The listed storage requirement should be treated as the minimum free space to reserve before the client is available. Launch downloads can also need temporary patching room, so players with a nearly full drive should clear additional space rather than stopping at exactly 100 GB. If the Steam client later publishes a preload window, this page should record the date, region and source before calling it confirmed.</p>")
 body += content_section("Download Prep Checklist", "<ol><li>Free at least 100 GB before advance access.</li><li>Use an SSD where possible because the storefront recommends it.</li><li>Update GPU drivers and Windows before launch day.</li><li>Check server status before assuming a download or login issue is local.</li></ol>")
+body += sources_section()
 write("preload-download/", page("AION 2 Preload and Download", "AION 2 preload, download and storage preparation page with 100 GB requirement and launch checklist.", "preload-download", body))
 
 body = hero("AION 2 System Requirements", "PC requirements currently listed for the Global Steam release.", "PC Specs")
 body += content_section("Minimum PC Requirements", "<div class='table-wrap'><table><thead><tr><th>Component</th><th>Requirement</th></tr></thead><tbody>" + "".join(f"<tr><th>{k}</th><td>{v}</td></tr>" for k, v in SYSTEM_REQUIREMENTS) + "</tbody></table></div>")
 body += content_section("Launch Prep Notes", "<ul><li>Reserve at least 100 GB before advance access begins.</li><li>Use an SSD where possible because the storefront note recommends it.</li><li>Minimum hardware should start with conservative graphics settings, then raise quality after checking performance in crowded areas.</li></ul>")
+body += sources_section()
 write("system-requirements/", page("AION 2 System Requirements", "AION 2 PC system requirements for OS, CPU, RAM, GPU, DirectX, storage and launch prep.", "system-requirements", body))
 
 body = hero("AION 2 Gameplay", "A pre-launch overview of the confirmed Global gameplay pillars: class-based combat, flight, PvE, PvP, crafting, trading and large-scale world exploration.", "Gameplay")
@@ -354,20 +363,27 @@ body = hero("AION 2 PvE Content", "Confirmed PvE scope for Global launch prepara
 body += content_section("Confirmed PvE Formats", "<div class='summary'><div><b>Solo</b><span>Solo dungeon format is named on Steam.</span></div><div><b>5-Player</b><span>Party dungeon format is named on Steam.</span></div><div><b>10-Player</b><span>Larger group dungeon format is named on Steam.</span></div><div><b>200+</b><span>Steam describes over 200 dungeons.</span></div></div>")
 body += content_section("Other PvE Systems", "<ul><li>Seasonal challenges are named as recurring PvE content.</li><li>Competitive rankings are named, which makes versioned meta tracking important.</li><li>Open-world events are named, but schedules and reward tables need Global verification.</li></ul>")
 body += content_section("Launch Tracking Plan", "<p>After advance access starts, this page should track dungeon names, requirements, boss mechanics, reward types, class performance and patch-specific changes.</p>")
+body += sources_section()
 write("pve-content/", page("AION 2 PvE Content", "AION 2 PvE content overview for dungeons, solo, 5-player, 10-player, seasonal challenges and open-world events.", "pve-content", body))
 
 body = hero("AION 2 Flight Combat", "Flight and vertical movement are a core Global marketing point, but exact combat advantages still need launch-client testing.", "Combat System")
 body += content_section("What Is Confirmed", "<p>Steam positions flight and verticality as central to combat and exploration. That matters for class evaluation because ranged uptime, melee gap-closing, line of sight, terrain and aerial positioning can all change how a class feels.</p>")
 body += content_section("What To Test", "<div class='table-wrap'><table><thead><tr><th>Test Area</th><th>Why It Matters</th></tr></thead><tbody><tr><th>Ranged uptime</th><td>Flight can make spacing easier or harder depending on encounter design.</td></tr><tr><th>Melee access</th><td>Gap closing and target stickiness may decide PvP strength.</td></tr><tr><th>Boss arenas</th><td>Vertical mechanics may change dungeon class value.</td></tr><tr><th>Resource limits</th><td>Flight duration or restrictions can change open-world routing.</td></tr></tbody></table></div>")
+body += sources_section()
 write("flight-combat/", page("AION 2 Flight Combat", "AION 2 flight combat overview and launch testing checklist for verticality, movement, PvE and PvP impact.", "flight-combat", body))
 
 body = hero("AION 2 Character Customization", "Steam describes over 200 customization options for Global launch.", "Customization")
 body += content_section("Confirmed Customization Scope", "<div class='notice'><b>Official pre-launch claim:</b> Steam describes over 200 character customization options.</div>")
-body += content_section("What To Track At Launch", "<ul><li>Body, face, hair and color option categories.</li><li>Whether any appearance options are tied to Founder Pack items or shop purchases.</li><li>Character creation limits such as name rules and slot count.</li><li>Cosmetic availability by edition and region.</li></ul>")
+body += content_section("What The Claim Does And Does Not Prove", "<p>The storefront claim is useful for launch preparation, but it does not yet tell players how those options are distributed across face, body, hair, voice, color, presets or post-creation editing. It also does not prove whether every option is available to every account, whether some cosmetics are founder bonuses, or whether appearance changes can be edited freely after character creation.</p>")
+body += content_section("What To Track At Launch", "<ul><li>Body, face, hair and color option categories.</li><li>Whether any appearance options are tied to Founder Pack items or shop purchases.</li><li>Character creation limits such as name rules and slot count.</li><li>Cosmetic availability by edition and region.</li><li>Whether saved presets, randomization and post-creation edits exist in the Global client.</li></ul>")
+body += sources_section()
 write("character-customization/", page("AION 2 Character Customization", "AION 2 character customization overview with confirmed 200+ customization option claim and launch tracking checklist.", "character-customization", body))
 
 body = hero("AION 2 Global vs KR/TW Meta", "The core editorial difference: reference regional data without presenting it as verified Global truth.", "Meta Method")
 body += content_section("Comparison", "<div class='table-wrap'><table><thead><tr><th>Topic</th><th>KR/TW</th><th>Global</th></tr></thead><tbody><tr><th>Classes</th><td>Existing live environment.</td><td>Launch roster tracked separately.</td></tr><tr><th>Balance</th><td>Regional live patches.</td><td>Global build must be verified.</td></tr><tr><th>Tier Lists</th><td>Useful reference.</td><td>TBD until tested.</td></tr><tr><th>Economy</th><td>Mature market.</td><td>Unknown launch market.</td></tr><tr><th>PvP Meta</th><td>Established assumptions.</td><td>Needs Global population and ruleset evidence.</td></tr><tr><th>Dungeons</th><td>May reveal mechanics and content patterns.</td><td>Names, rewards and tuning must be confirmed on Global.</td></tr></tbody></table></div>")
+body += content_section("Why Regional Data Can Mislead", "<p>Regional versions can be useful for deciding what to test first, but they can mislead Global players when patch timing, monetization, economy maturity, server population or launch roster differs. A build that is stable in an older live environment may be wrong for a fresh Global economy, and a PvP matchup that depends on experienced players may not describe launch-week behavior.</p>")
+body += content_section("How This Site Uses KR/TW Reference", "<ol><li>Use regional data to form test hypotheses.</li><li>Label it as KR/TW Reference, never Global Verified.</li><li>Retest in the Global client before updating ranks or build recommendations.</li><li>Log every rank change with patch, date and reason.</li></ol>")
+body += sources_section()
 write("meta/global-vs-korea/", page("AION 2 Global vs Korea Meta", "AION 2 Global vs KR/TW meta comparison and evidence policy.", "meta/global-vs-korea", body))
 
 meta_hub_cards = card("Global vs KR/TW", "Separate regional reference from Global proof.", "/meta/global-vs-korea/", "Meta")
@@ -396,7 +412,9 @@ write("meta/launch-verification-checklist/", page("AION 2 Launch Verification Ch
 body = hero("AION 2 Dungeons", "Dungeon pages will launch only when Global names, requirements, boss mechanics and rewards are verified.", "Dungeon Hub")
 body += content_section("Confirmed Dungeon Scope", "<div class='summary'><div><b>Total Scope</b><span>Over 200 dungeons described on Steam.</span></div><div><b>Solo</b><span>Solo challenge format named.</span></div><div><b>Party</b><span>5-player party content named.</span></div><div><b>Group</b><span>10-player group dungeons named.</span></div></div>")
 body += content_section("Future Page Structure", "<ol><li>Requirements</li><li>Bosses and mechanics</li><li>Rewards</li><li>Recommended classes</li><li>Party composition</li><li>Tips and patch changes</li></ol>")
-body += content_section("Why This Hub Exists Now", "<p>Steam describes AION 2 as having extensive dungeon content, but the useful SEO moat comes after real Global dungeon data is available. This hub prepares the structure without inventing 200 thin pages.</p>")
+body += content_section("Why This Hub Exists Now", "<p>Steam describes AION 2 as having extensive dungeon content, but the useful SEO moat comes after real Global dungeon data is available. This hub prepares the structure without inventing 200 thin pages. Individual dungeon URLs should be created only when the Global name, entry requirement, party size, boss mechanics and reward table can be checked.</p>")
+body += content_section("Launch Verification Priorities", "<ul><li>Record the first dungeon names exactly as they appear in the Global client.</li><li>Separate solo, 5-player and 10-player content instead of merging them into one list.</li><li>Capture requirements, boss names, mechanics and reward screenshots before publishing an individual dungeon page.</li><li>Track which classes feel valuable by activity, but avoid turning one dungeon impression into a site-wide tier claim.</li></ul>")
+body += sources_section()
 write("dungeons/", page("AION 2 Dungeons", "AION 2 dungeon hub for Global launch, prepared for verified dungeon requirements, mechanics and rewards.", "dungeons", body))
 
 body = hero("Page Not Found", "This AION 2 Meta page does not exist yet, or it may be waiting for Global verification.", "404")
